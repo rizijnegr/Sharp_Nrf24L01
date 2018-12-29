@@ -299,6 +299,17 @@ namespace NRF24L01Plus
             return result[0];
         }
         
+        public void OpenReadingPipe(byte[] pipe, byte pipeNumber)
+        {
+            if (pipeNumber > 5)
+                throw new ArgumentException("Only pipes 0-5 are allowed");
+            if (pipeNumber > 0)
+            {
+                WriteRegister(pipes[pipeNumber], pipe);
+                WriteRegister(EN_RXADDR, (byte)(ReadRegister(EN_RXADDR) | (1 << pipeEnabledFlag[pipeNumber])));
+            }
+        }
+
         /// <summary>
         /// Open pipe for reaceiving data
         /// </summary>
