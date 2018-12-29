@@ -25,6 +25,7 @@ using System.Devices.Gpio;
 using System.Devices.Spi;
 using System.Threading;
 using System.Text;
+using System.Collections.Generic;
 
 namespace NRF24L01Plus
 { 
@@ -60,6 +61,12 @@ namespace NRF24L01Plus
         private const byte RX_ADDR_P3 = 0x0D;
         private const byte RX_ADDR_P4 = 0x0E;
         private const byte RX_ADDR_P5 = 0x0F;
+        private const byte ERX_P5 = 5;
+        private const byte ERX_P4 = 4;
+        private const byte ERX_P3 = 3;
+        private const byte ERX_P2 = 2;
+        private const byte ERX_P1 = 1;
+        private const byte ERX_P0 = 0;
         private const byte TX_ADDR = 0x10;
         private const byte RX_PW_P0 = 0x11;
         private const byte RX_PW_P1 = 0x12;
@@ -102,6 +109,11 @@ namespace NRF24L01Plus
         private const int MAX_RT = 4;
         private const int RX_P_NO = 1;
         private const int TX_FULL = 0;
+
+        private readonly List<byte> pipes = new List<byte> { RX_ADDR_P0,
+            RX_ADDR_P1, RX_ADDR_P2, RX_ADDR_P3, RX_ADDR_P4, RX_ADDR_P5 };
+        private readonly List<byte> pipeEnabledFlag = new List<byte> { ERX_P0,
+            ERX_P1, ERX_P2, ERX_P3, ERX_P4, ERX_P5 };
         #endregion
 
         public WhatHappened WhatHappened
@@ -167,7 +179,7 @@ namespace NRF24L01Plus
             irq.ValueChanged += Irq_ValueChanged;
 
             Thread.Sleep(20);
-            SetRxPayload(packetSize);
+            SetRxPayloadSize(packetSize);
 
             SetChannel(0x76);
             if (SetDataRate(DataRate.DR250Kbps))
@@ -288,40 +300,40 @@ namespace NRF24L01Plus
         }
         
         /// <summary>
+        /// Open pipe for reaceiving data
+        /// </summary>
+        /// <param name="pipe">Pipe address (MSB first)</param>
+        /// <param name="pipeNumber">Pipe number (1-5)</param>
+        public void OpenReadingPipe(byte[] pipe, byte pipeNumber)
+        {
+            if (pipeNumber > 5)
+                throw new ArgumentException("Only pipes 0-5 are allowed");
+            if (pipeNumber > 0)
+            {
+                WriteRegister(pipes[pipeNumber], pipe);
+                WriteRegister(EN_RXADDR, (byte)(ReadRegister(EN_RXADDR) | (1 << pipeEnabledFlag[pipeNumber])));
+            }
+        }
+
+        /// <summary>
         /// Set Receive Packet Size (All Pipe)
         /// </summary>
-        /// <param name="payload">Size, from 0 to 32</param>
-        public void SetRxPayload(byte payload)
+        /// <param name="payloadSize">Size, from 0 to 32</param>
+        public void SetRxPayloadSize(byte payloadSize)
         {
-            if (payload > 32 || payload < 0)
+            if (payloadSize > 32 || payloadSize < 0)
             {
                 throw new ArgumentOutOfRangeException("payload", "payload from 0 to 32 !");
             }
 
-            WriteRegister(RX_PW_P0, payload);
-            WriteRegister(RX_PW_P1, payload);
-            WriteRegister(RX_PW_P2, payload);
-            WriteRegister(RX_PW_P3, payload);
-            WriteRegister(RX_PW_P4, payload);
-            WriteRegister(RX_PW_P5, payload);
+            WriteRegister(RX_PW_P0, payloadSize);
+            WriteRegister(RX_PW_P1, payloadSize);
+            WriteRegister(RX_PW_P2, payloadSize);
+            WriteRegister(RX_PW_P3, payloadSize);
+            WriteRegister(RX_PW_P4, payloadSize);
+            WriteRegister(RX_PW_P5, payloadSize);
         }
-
-        /// <summary>
-        /// Set Receive Packet Size
-        /// </summary>
-        /// <param name="pipe">Pipe, form 0 to 5</param>
-        /// <param name="payload">Size, from 0 to 32</param>
-        public void SetRxPayload(byte pipe, byte payload)
-        {
-            if (payload > 32 || payload < 0)
-                throw new ArgumentOutOfRangeException("payload", "payload from 0 to 32 !");
-
-            if (pipe > 5 || pipe < 0)
-                throw new ArgumentOutOfRangeException("pipe", "pipe from 0 to 5 !");
-
-            WriteRegister((byte)(RX_PW_P0 + pipe), payload);
-        }
-
+        
         /// <summary>
         /// Set retry policy
         /// </summary>
@@ -395,29 +407,7 @@ namespace NRF24L01Plus
             byte setting = (byte)(enabled ? 0x3F : 0x00);
             WriteRegister(EN_AA, setting);
         }
-
-        /// <summary>
-        /// Set Auto Acknowledgment
-        /// </summary>
-        /// <param name="pipe">Pipe, form 0 to 5</param>
-        /// <param name="enabled">Is Enable</param>
-        public void SetAutoAck(byte pipe, bool enabled)
-        {
-            byte setting = (byte)(ReadRegister(EN_AA) & ~(byte)(1 << pipe));
-            if (enabled) setting |= (byte)(1 << pipe);
-            WriteRegister(EN_AA, setting);
-        }
-
-        /// <summary>
-        /// Set Receive Pipe (All Pipes)
-        /// </summary>
-        /// <param name="enabled"></param>
-        public void SetRxPipe(bool enabled)
-        {
-            byte setting = (byte)(enabled ? 0x3F : 0x00);
-            WriteRegister(EN_RXADDR, setting);
-        }
-
+        
         /// <summary>
         /// Mask data ready event
         /// </summary>
@@ -459,19 +449,7 @@ namespace NRF24L01Plus
                 cfg.Persist(this);
             }
         }
-
-        /// <summary>
-        /// Set Receive Pipe
-        /// </summary>
-        /// <param name="pipe">Pipe, form 0 to 5</param>
-        /// <param name="enabled">Is Enable</param>
-        public void SetRxPipe(byte pipe, bool enabled)
-        {
-            byte setting = (byte)(ReadRegister(EN_RXADDR) & ~(byte)(1 << pipe));
-            if (enabled) setting |= (byte)(1 << pipe);
-            WriteRegister(EN_RXADDR, setting);
-        }
-
+        
         /// <summary>
         /// Set Power Mode
         /// </summary>
@@ -512,6 +490,7 @@ namespace NRF24L01Plus
             WriteRegister(DYNPD, setting);
         }
 
+        // Enable features
         private void ToggleFeatures()
         {
             byte activate = 0x50;
@@ -558,57 +537,7 @@ namespace NRF24L01Plus
             var dataRate = ReadRegister(RF_SETUP) & ((byte)DataRate.DR250Kbps | (byte)DataRate.DR2Mbps);
             return (DataRate)dataRate;
         }
-
-        /// <summary>
-        /// Set Receive Address
-        /// </summary>
-        /// <param name="pipe">Pipe, form 0 to 5</param>
-        /// <param name="address">Address, if (pipe > 1) then (address.Length = 1), else if (pipe = 1 || pipe = 0) then (address.Length = 5)</param>
-        public void SetRxAddress(byte pipe, byte[] address)
-        {
-            if (address.Length > 5)
-            {
-                throw new ArgumentOutOfRangeException("Array Length must less than 6 !");
-            }
-
-            if (pipe > 1 && address.Length > 1)
-            {
-                throw new ArgumentOutOfRangeException("Array Length must equal 1 when pipe more than 1. Address equal pipe1's address the first 4 byte + one byte your custom !");
-            }
-            
-            byte[] buffer = new byte[1 + address.Length];
-            buffer[0] = (byte)(W_REGISTER + RX_ADDR_P0 + pipe);
-            for (int i = 0; i < address.Length; i++)
-            {
-                buffer[1 + i] = address[i];
-            }
-
-            sensor.Write(buffer);
-            
-        }
-
-        /// <summary>
-        /// Set Send Address
-        /// </summary>
-        /// <param name="address">Address, address.Length = 5</param>
-        public void SetTxAddress(byte[] address)
-        {
-            if (address.Length > 5)
-            {
-                throw new ArgumentOutOfRangeException("Array Length must less than 5 !");
-            }
-            
-            byte[] buffer = new byte[1 + address.Length];
-            buffer[0] = (byte)(W_REGISTER + TX_ADDR);
-            for (int i = 0; i < address.Length; i++)
-            {
-                buffer[1 + i] = address[i];
-            }
-
-            sensor.Write(buffer);
-            
-        }
-
+        
         /// <summary>
         /// Set Working Channel
         /// </summary>
@@ -617,31 +546,7 @@ namespace NRF24L01Plus
         {
             WriteRegister(RF_CH, channel);
         }
-
-        /// <summary>
-        /// Send
-        /// </summary>
-        /// <param name="data">Data</param>
-        public async void Send(byte[] data)
-        {
-            SetWorkingMode(ChipWorkMode.Transfer);
-            await Task.Delay(4);
-
-            byte[] buffer = new byte[1 + data.Length];
-            buffer[0] = W_TX_PAYLOAD;
-            for (int i = 0; i < data.Length; i++)
-            {
-                buffer[1 + i] = data[i];
-            }
-            sensor.Write(buffer);
-
-            await Task.Delay(10);
-
-            SetWorkingMode(ChipWorkMode.Receive);
-            await Task.Delay(1);
-        }
-
-
+        
         /// <summary>
         /// Send
         /// </summary>
@@ -652,7 +557,7 @@ namespace NRF24L01Plus
                 ce.Write(PinValue.Low);
 
             FlushTX();
-            //WriteRegister(RX_ADDR_P0, pipeAddress);
+            WriteRegister(RX_ADDR_P0, pipeAddress);
             WriteRegister(TX_ADDR, pipeAddress);
             WriteRegister(RX_PW_P0, packetSize);
             
@@ -685,13 +590,16 @@ namespace NRF24L01Plus
                 retries++;
             }
             ClearTransmitEventRegisters();
-            Console.WriteLine("WH: " + whatHappened.ToString());
-
+            
             FlushTX();
             SetWorkingMode(ChipWorkMode.Receive);
             ce.Write(PinValue.High);
         }
 
+        /// <summary>
+        /// Indicates whether new data is available
+        /// </summary>
+        /// <returns></returns>
         public bool NewDataAvailable()
         {
             return WhatHappened.NewDataReceived || !FifoStatus.Parse(this).RXEmpty;
@@ -727,12 +635,10 @@ namespace NRF24L01Plus
             driver?.Dispose();
         }
 
-        public delegate void ReceivedDataHandle(object sender, ReceivedDataEventArgs e);
-
         /// <summary>
         /// Triggering when data was received
         /// </summary>
-        public event ReceivedDataHandle ReceivedData;
+        public event EventHandler<ReceivedDataEventArgs> ReceivedData;
 
         private void Irq_ValueChanged(object sender, PinValueChangedEventArgs args)
         {
