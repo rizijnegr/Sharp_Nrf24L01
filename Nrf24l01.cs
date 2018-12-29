@@ -25,6 +25,7 @@ using System.Devices.Gpio;
 using System.Devices.Spi;
 using System.Threading;
 using System.Text;
+using System.Collections.Generic;
 
 namespace NRF24L01Plus
 { 
@@ -60,6 +61,12 @@ namespace NRF24L01Plus
         private const byte RX_ADDR_P3 = 0x0D;
         private const byte RX_ADDR_P4 = 0x0E;
         private const byte RX_ADDR_P5 = 0x0F;
+        private const byte ERX_P5 = 5;
+        private const byte ERX_P4 = 4;
+        private const byte ERX_P3 = 3;
+        private const byte ERX_P2 = 2;
+        private const byte ERX_P1 = 1;
+        private const byte ERX_P0 = 0;
         private const byte TX_ADDR = 0x10;
         private const byte RX_PW_P0 = 0x11;
         private const byte RX_PW_P1 = 0x12;
@@ -102,6 +109,11 @@ namespace NRF24L01Plus
         private const int MAX_RT = 4;
         private const int RX_P_NO = 1;
         private const int TX_FULL = 0;
+
+        private readonly List<byte> pipes = new List<byte> { RX_ADDR_P0,
+            RX_ADDR_P1, RX_ADDR_P2, RX_ADDR_P3, RX_ADDR_P4, RX_ADDR_P5 };
+        private readonly List<byte> pipeEnabledFlag = new List<byte> { ERX_P0,
+            ERX_P1, ERX_P2, ERX_P3, ERX_P4, ERX_P5 };
         #endregion
 
         public WhatHappened WhatHappened
@@ -287,6 +299,17 @@ namespace NRF24L01Plus
             return result[0];
         }
         
+        public void OpenReadingPipe(byte[] pipe, byte pipeNumber)
+        {
+            if (pipeNumber > 5)
+                throw new ArgumentException("Only pipes 0-5 are allowed");
+            if (pipeNumber > 0)
+            {
+                WriteRegister(pipes[pipeNumber], pipe);
+                WriteRegister(EN_RXADDR, (byte)(ReadRegister(EN_RXADDR) | (1 << pipeEnabledFlag[pipeNumber])));
+            }
+        }
+
         /// <summary>
         /// Set Receive Packet Size (All Pipe)
         /// </summary>
@@ -652,7 +675,7 @@ namespace NRF24L01Plus
                 ce.Write(PinValue.Low);
 
             FlushTX();
-            //WriteRegister(RX_ADDR_P0, pipeAddress);
+            WriteRegister(RX_ADDR_P0, pipeAddress);
             WriteRegister(TX_ADDR, pipeAddress);
             WriteRegister(RX_PW_P0, packetSize);
             
@@ -685,8 +708,7 @@ namespace NRF24L01Plus
                 retries++;
             }
             ClearTransmitEventRegisters();
-            Console.WriteLine("WH: " + whatHappened.ToString());
-
+            
             FlushTX();
             SetWorkingMode(ChipWorkMode.Receive);
             ce.Write(PinValue.High);
