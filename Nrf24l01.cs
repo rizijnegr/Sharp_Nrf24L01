@@ -41,7 +41,6 @@ namespace NRF24L01Plus
         private int CS;
         private int CE;
         private int IRQ;
-        private string spi;
 
         private byte packetSize;
 
@@ -147,12 +146,10 @@ namespace NRF24L01Plus
         /// <param name="CSN">CSN Pin</param>
         /// <param name="CE">CE Pin</param>
         /// <param name="IRQ">IRQ Pin</param>
-        /// <param name="SPI">SPI Friendly Name,like 'SPI0', 'SPI1'.</param>
         /// <param name="packetSize">Receive Packet Size</param>
-        public NRF24L01(int CSN, int CE, int IRQ, string SPI, byte packetSize)
+        public NRF24L01(int CSN, int CE, int IRQ, byte packetSize)
         {
             this.CS = CSN;
-            this.spi = SPI;
             this.CE = CE;
             this.IRQ = IRQ;
             this.packetSize = packetSize;
@@ -165,7 +162,7 @@ namespace NRF24L01Plus
         public void Initialize()
         {
             var settings = new SpiConnectionSettings(0, (uint)CS);
-            settings.ClockFrequency = 8000000U; //500000U;
+            settings.ClockFrequency = 8000000U; 
             settings.DataBitLength = 8;
             settings.Mode = SpiMode.Mode0;
 
@@ -297,17 +294,6 @@ namespace NRF24L01Plus
             byte[] result = new byte[1];
             sensor.TransferFullDuplex(new byte[] { NOP }, result);
             return result[0];
-        }
-        
-        public void OpenReadingPipe(byte[] pipe, byte pipeNumber)
-        {
-            if (pipeNumber > 5)
-                throw new ArgumentException("Only pipes 0-5 are allowed");
-            if (pipeNumber > 0)
-            {
-                WriteRegister(pipes[pipeNumber], pipe);
-                WriteRegister(EN_RXADDR, (byte)(ReadRegister(EN_RXADDR) | (1 << pipeEnabledFlag[pipeNumber])));
-            }
         }
 
         /// <summary>
